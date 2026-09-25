@@ -8,25 +8,30 @@ http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" });
     res.end("EVIL BOT IS ALIVE ON KOYEB");
 }).listen(PORT, () => {
-    console.log(`🌐 Keep-alive server listening on port ${PORT}`);
+    console.log(`🌐 Health server listening on port ${PORT}`);
 });
 
-// ⚠️ REPLACE THIS WITH YOUR WHATSAPP NUMBER (Country code + number, NO '+' or spaces)
-// Example for Nigeria: "2348123456789"
-const PHONE_NUMBER = "234XXXXXXXXXX"; 
+// Reads phone number from Koyeb Environment Variables (e.g., "2348123456789")
+const PHONE_NUMBER = process.env.PHONE_NUMBER;
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState("auth_info_baileys");
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false // Turn off QR code generation
+        printQRInTerminal: false,
+        browser: ["EVIL Bot", "Chrome", "1.0.0"]
     });
 
     sock.ev.on("creds.update", saveCreds);
 
-    // Request 8-digit pairing code if session is not saved
+    // Request Pairing Code if session is not registered
     if (!sock.authState.creds.registered) {
+        if (!PHONE_NUMBER) {
+            console.error("❌ ERROR: PHONE_NUMBER environment variable is not set!");
+            return;
+        }
+
         setTimeout(async () => {
             try {
                 const code = await sock.requestPairingCode(PHONE_NUMBER);
@@ -43,9 +48,15 @@ async function startBot() {
         const { connection, lastDisconnect } = update;
 
         if (connection === "close") {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log("Connection closed. Reconnecting:", shouldReconnect);
-            if (shouldReconnect) startBot();
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log(`Connection closed (status: ${statusCode}). Reconnecting: ${shouldReconnect}`);
+            
+            if (shouldReconnect) {
+                startBot();
+            } else {
+                console.log("❌ Connection dropped permanently/logged out. Clear session and restart.");
+            }
         } else if (connection === "open") {
             console.log("🔥 EVIL BOT CONNECTED SUCCESSFULLY 🔥");
         }
@@ -54,7 +65,11 @@ async function startBot() {
     sock.ev.on("messages.upsert", async ({ messages, type }) => {
         if (type !== "notify") return;
         for (const msg of messages) {
-            await handleMessage(sock, msg);
+            try {
+                await handleMessage(sock, msg);
+            } catch (err) {
+                console.error("Error processing message handler:", err);
+            }
         }
     });
 }
