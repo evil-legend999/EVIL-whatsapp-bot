@@ -1,8 +1,8 @@
 import http from "http";
-import { makeWASocket, useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
+// 1. Import 'Browsers' alongside your other imports
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } from "@whiskeysockets/baileys";
 import { handleMessage } from "./handlers/messageHandler.js";
 
-// Health Check Server for Render (Default port is 10000 or process.env.PORT)
 const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" });
@@ -11,7 +11,6 @@ http.createServer((req, res) => {
     console.log(`🌐 Server listening on port ${PORT}`);
 });
 
-// WhatsApp Phone Number from Environment Variable
 const PHONE_NUMBER = process.env.PHONE_NUMBER;
 
 async function startBot() {
@@ -19,13 +18,14 @@ async function startBot() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // Disable terminal QR codes
-        browser: ["EVIL Bot", "Chrome", "1.0.0"]
+        printQRInTerminal: false,
+        // 2. Set official Ubuntu Chrome browser identity:
+        browser: Browsers.ubuntu("Chrome"),
+        syncFullHistory: false
     });
 
     sock.ev.on("creds.update", saveCreds);
 
-    // Request 8-digit pairing code if session isn't registered yet
     if (!sock.authState.creds.registered) {
         if (!PHONE_NUMBER) {
             console.error("❌ ERROR: PHONE_NUMBER environment variable is not set!");
@@ -34,7 +34,8 @@ async function startBot() {
 
         setTimeout(async () => {
             try {
-                const code = await sock.requestPairingCode(PHONE_NUMBER);
+                // Request phone pairing code using the configured browser signature
+                const code = await sock.requestPairingCode(PHONE_NUMBER.trim());
                 console.log("\n====================================");
                 console.log(`🔑 YOUR PAIRING CODE: ${code}`);
                 console.log("====================================\n");
