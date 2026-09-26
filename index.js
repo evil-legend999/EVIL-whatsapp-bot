@@ -2,16 +2,16 @@ import http from "http";
 import { makeWASocket, useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
 import { handleMessage } from "./handlers/messageHandler.js";
 
-// Keep-Alive HTTP Server for Koyeb Health Checks
-const PORT = process.env.PORT || 8080;
+// Health Check Server for Render (Default port is 10000 or process.env.PORT)
+const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("EVIL BOT IS ALIVE ON KOYEB");
+    res.end("EVIL BOT IS ALIVE ON RENDER");
 }).listen(PORT, () => {
-    console.log(`🌐 Health server listening on port ${PORT}`);
+    console.log(`🌐 Server listening on port ${PORT}`);
 });
 
-// Reads phone number from Koyeb Environment Variables (e.g., "2348123456789")
+// WhatsApp Phone Number from Environment Variable
 const PHONE_NUMBER = process.env.PHONE_NUMBER;
 
 async function startBot() {
@@ -19,13 +19,13 @@ async function startBot() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false,
+        printQRInTerminal: false, // Disable terminal QR codes
         browser: ["EVIL Bot", "Chrome", "1.0.0"]
     });
 
     sock.ev.on("creds.update", saveCreds);
 
-    // Request Pairing Code if session is not registered
+    // Request 8-digit pairing code if session isn't registered yet
     if (!sock.authState.creds.registered) {
         if (!PHONE_NUMBER) {
             console.error("❌ ERROR: PHONE_NUMBER environment variable is not set!");
@@ -50,13 +50,9 @@ async function startBot() {
         if (connection === "close") {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-            console.log(`Connection closed (status: ${statusCode}). Reconnecting: ${shouldReconnect}`);
+            console.log(`Connection closed (status ${statusCode}). Reconnecting: ${shouldReconnect}`);
             
-            if (shouldReconnect) {
-                startBot();
-            } else {
-                console.log("❌ Connection dropped permanently/logged out. Clear session and restart.");
-            }
+            if (shouldReconnect) startBot();
         } else if (connection === "open") {
             console.log("🔥 EVIL BOT CONNECTED SUCCESSFULLY 🔥");
         }
@@ -68,7 +64,7 @@ async function startBot() {
             try {
                 await handleMessage(sock, msg);
             } catch (err) {
-                console.error("Error processing message handler:", err);
+                console.error("Error handling message:", err);
             }
         }
     });
